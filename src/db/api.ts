@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { DEFAULT_SCHEMES } from './defaultSchemes';
 import type {
   Profile,
   Scheme,
@@ -60,62 +61,98 @@ export const profileApi = {
 
 // Schemes API
 export const schemesApi = {
-  async getAllSchemes(limit = 50, offset = 0): Promise<Scheme[]> {
-    const { data, error } = await supabase
-      .from('schemes')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+  async getAllSchemes(limit = 100, offset = 0): Promise<Scheme[]> {
+    try {
+      const { data, error } = await supabase
+        .from('schemes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
-    if (error) throw error;
-    return Array.isArray(data) ? data : [];
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data;
+      }
+    } catch (e) {
+      console.warn('Supabase fetch schemes error, falling back to static schemes dataset:', e);
+    }
+    return DEFAULT_SCHEMES.slice(offset, offset + limit);
   },
 
   async getSchemeById(id: string): Promise<Scheme | null> {
-    const { data, error } = await supabase
-      .from('schemes')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from('schemes')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
 
-    if (error) throw error;
-    return data;
+      if (!error && data) {
+        return data;
+      }
+    } catch (e) {
+      console.warn('Supabase getSchemeById error:', e);
+    }
+    return DEFAULT_SCHEMES.find((s) => s.id === id) || null;
   },
 
   async getSchemesByCategory(category: string, limit = 20): Promise<Scheme[]> {
-    const { data, error } = await supabase
-      .from('schemes')
-      .select('*')
-      .eq('category', category)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    try {
+      const { data, error } = await supabase
+        .from('schemes')
+        .select('*')
+        .eq('category', category)
+        .order('created_at', { ascending: false })
+        .limit(limit);
 
-    if (error) throw error;
-    return Array.isArray(data) ? data : [];
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data;
+      }
+    } catch (e) {
+      console.warn('Supabase getSchemesByCategory error:', e);
+    }
+    return DEFAULT_SCHEMES.filter((s) => s.category.toLowerCase().includes(category.toLowerCase())).slice(0, limit);
   },
 
   async getSchemesByState(state: string, limit = 20): Promise<Scheme[]> {
-    const { data, error } = await supabase
-      .from('schemes')
-      .select('*')
-      .or(`state.eq.${state},state.is.null`)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    try {
+      const { data, error } = await supabase
+        .from('schemes')
+        .select('*')
+        .or(`state.eq.${state},state.is.null`)
+        .order('created_at', { ascending: false })
+        .limit(limit);
 
-    if (error) throw error;
-    return Array.isArray(data) ? data : [];
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data;
+      }
+    } catch (e) {
+      console.warn('Supabase getSchemesByState error:', e);
+    }
+    return DEFAULT_SCHEMES.filter((s) => s.state === state || s.state === null).slice(0, limit);
   },
 
   async searchSchemes(query: string, limit = 20): Promise<Scheme[]> {
-    const { data, error } = await supabase
-      .from('schemes')
-      .select('*')
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    try {
+      const { data, error } = await supabase
+        .from('schemes')
+        .select('*')
+        .or(`name.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`)
+        .order('created_at', { ascending: false })
+        .limit(limit);
 
-    if (error) throw error;
-    return Array.isArray(data) ? data : [];
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data;
+      }
+    } catch (e) {
+      console.warn('Supabase searchSchemes error:', e);
+    }
+    const q = query.toLowerCase();
+    return DEFAULT_SCHEMES.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.description.toLowerCase().includes(q) ||
+        s.category.toLowerCase().includes(q)
+    ).slice(0, limit);
   },
 
   async createScheme(scheme: Omit<Scheme, 'id' | 'created_at' | 'updated_at'>): Promise<Scheme> {

@@ -17,31 +17,51 @@ export default function DashboardPage() {
   const [schemes, setSchemes] = useState<SchemeWithEligibility[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Fallback profile if user profile is pending or not yet fully populated
+  const activeProfile = profile || {
+    id: 'user-default',
+    email: null,
+    username: 'user',
+    role: 'user' as const,
+    name: 'Aditya Saha',
+    age: 22,
+    state: 'West Bengal',
+    city: 'Kolkata',
+    profession: 'Student',
+    income: 250000,
+    category: 'General',
+    education: 'Graduate',
+    interests: [],
+    gender: 'Male',
+    address: null,
+    aadhaar_verified: true,
+    profile_completed: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
   useEffect(() => {
     loadSchemes();
   }, [profile]);
 
   const loadSchemes = async () => {
-    if (!profile) return;
-
     try {
-      const suggestionQuery = [profile.profession, profile.state, profile.category, 'recommended schemes']
-        .filter(Boolean)
-        .join(' ');
+      setIsLoading(true);
+      const allSchemes = await schemesApi.getAllSchemes(100);
+      const evaluated = allSchemes.map((scheme) => calculateEligibility(activeProfile, scheme));
 
-      const suggestedSchemes = await aiApi.getSchemeSuggestions({
-        query: suggestionQuery,
-        profile,
-        limit: 6,
+      // Prioritize state match and higher eligibility scores
+      const sorted = evaluated.sort((a, b) => {
+        const aStateMatch = a.state === activeProfile.state || a.state === null;
+        const bStateMatch = b.state === activeProfile.state || b.state === null;
+
+        if (aStateMatch && !bStateMatch) return -1;
+        if (!aStateMatch && bStateMatch) return 1;
+
+        return b.eligibility_score - a.eligibility_score;
       });
 
-      if (suggestedSchemes.length > 0) {
-        setSchemes(suggestedSchemes);
-        return;
-      }
-
-      const allSchemes = await schemesApi.getAllSchemes(50);
-      setSchemes(allSchemes.map((scheme) => calculateEligibility(profile, scheme)).sort((a, b) => b.eligibility_score - a.eligibility_score));
+      setSchemes(sorted);
     } catch (error) {
       console.error('Failed to load schemes:', error);
     } finally {
