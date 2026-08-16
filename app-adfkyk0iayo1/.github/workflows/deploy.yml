@@ -1,0 +1,48 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  deploy-frontend:
+    name: Deploy frontend to Vercel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+
+  deploy-supabase:
+    name: Deploy Supabase functions
+    runs-on: ubuntu-latest
+    needs: deploy-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Supabase CLI
+        run: |
+          curl -sL https://github.com/supabase/cli/releases/latest/download/install.sh | bash
+      - name: Deploy Supabase functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase login --access-token $SUPABASE_ACCESS_TOKEN
+          cd supabase/functions
+          for fn in $(ls -1); do
+            if [ -d "$fn" ]; then
+              supabase functions deploy $fn --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} || true
+            fi
+          done
